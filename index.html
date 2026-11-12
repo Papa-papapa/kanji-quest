@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fff8e8">
+<link rel="manifest" href="manifest.webmanifest">
+<title>漢字クエスト</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#29251f;background:#fff8e8}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:18px}
+main{max-width:760px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;margin:4px 0 18px}
+h1{font-size:clamp(24px,5vw,34px);margin:0}
+.panel{background:white;border:1px solid #eee1c9;border-radius:20px;padding:clamp(16px,4vw,26px);box-shadow:0 5px 18px #6b4b1710}
+.label{font-size:14px;color:#88765e;margin-bottom:8px}
+.prompt{font-size:clamp(27px,7vw,42px);font-weight:700;letter-spacing:.08em;min-height:1.5em}
+button{border:0;border-radius:12px;padding:13px 18px;font-size:16px;font-weight:650;cursor:pointer}
+.primary{background:#315e49;color:white;flex:1}.secondary{background:#f1eadc;color:#463b2d}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.grade-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:20px}
+.grade{background:#f1eadc;color:#463b2d;min-height:68px;font-size:20px}
+.grade small{display:block;font-size:12px;font-weight:400;margin-top:3px}
+.canvas-wrap{margin-top:18px}
+canvas{display:block;width:100%;height:min(55vh,380px);min-height:230px;border:2px solid #dfd4c2;border-radius:14px;background:#fff;touch-action:none}
+.answer{margin-top:16px;padding:14px;background:#f3f7ef;border-radius:12px;display:none}
+.answer strong{font-size:30px;margin-right:10px}
+.note{font-size:13px;color:#817565;line-height:1.6;margin:14px 2px 0}
+#practice{display:none}
+#setup{display:block}
+.count{font-size:14px;color:#766b5c}
+</style>
+</head>
+<body>
+<main>
+<header><h1>漢字クエスト</h1><div class="count" id="count"></div></header>
+<section class="panel" id="setup">
+  <div class="label">はじめに教えてね</div>
+  <div class="prompt">何年生？</div>
+  <p>選んだ学年までに習う漢字から問題を出すよ。</p>
+  <div class="grade-grid" id="grades">
+    <button class="grade" data-grade="1">小学1年生<small>1年生までの漢字</small></button>
+    <button class="grade" data-grade="2">小学2年生<small>2年生までの漢字</small></button>
+    <button class="grade" data-grade="3">小学3年生<small>3年生までの漢字</small></button>
+    <button class="grade" data-grade="4">小学4年生<small>4年生までの漢字</small></button>
+    <button class="grade" data-grade="5">小学5年生<small>5年生までの漢字</small></button>
+    <button class="grade" data-grade="6">小学6年生<small>6年生までの漢字</small></button>
+  </div>
+  <p class="note">学年を選ぶと、その学年までに習う漢字を使った問題が始まります。</p>
+</section>
+<section class="panel" id="practice">
+  <div class="label">このことばを漢字で書こう</div>
+  <div class="prompt" id="prompt"></div>
+  <div class="canvas-wrap">
+    <div class="label">ここに書いてね（見本やなぞり書きはありません）</div>
+    <canvas id="pad" aria-label="漢字を書く場所"></canvas>
+  </div>
+  <div class="actions">
+    <button class="secondary" id="clear">書きなおす</button>
+    <button class="secondary" id="show">答えを見る</button>
+    <button class="primary" id="next">次の問題へ</button>
+  </div>
+  <div class="answer" id="answer"><strong id="answerKanji"></strong></div>
+  <div class="actions"><button class="secondary" id="changeGrade">学年を選びなおす</button></div>
+  <p class="note">答えを見るまでは正解は表示されません。自分で書いてから、答えと見比べてみよう。</p>
+</section>
+</main>
+<script>
+// 学年別配当漢字（教育漢字）を収録。問題は、選択学年までの漢字を含む語から出題します。
+const WORDS = [
+[1,"やま","山"],[1,"かわ","川"],[1,"そら","空"],[1,"はな","花"],[1,"くさ","草"],[1,"いし","石"],[1,"みず","水"],[1,"ひ","日"],[1,"つき","月"],[1,"ひと","人"],[1,"こ","子"],[1,"おとこ","男"],[1,"おんな","女"],[1,"あめ","雨"],[1,"ゆき","雪"],[1,"き","木"],[1,"はやし","林"],[1,"もり","森"],[1,"いぬ","犬"],[1,"ねこ","猫"],
+[2,"きょうしつ","教室"],[2,"がっこう","学校"],[2,"ともだち","友達"],[2,"でんしゃ","電車"],[2,"かぞく","家族"],[2,"あさごはん","朝ご飯"],[2,"うみ","海"],[2,"はる","春"],[2,"なつ","夏"],[2,"あき","秋"],[2,"ふゆ","冬"],[2,"たべもの","食べ物"],[2,"のりもの","乗り物"],[2,"しんぶん","新聞"],[2,"かいもの","買い物"],
+[3,"あんぜん","安全"],[3,"いけん","意見"],[3,"うんどう","運動"],[3,"えいご","英語"],[3,"おんがく","音楽"],[3,"かんじ","漢字"],[3,"きゅうしょく","給食"],[3,"けんこう","健康"],[3,"しぜん","自然"],[3,"しゅうかん","習慣"],[3,"せかい","世界"],[3,"ちいき","地域"],[3,"ちゅうい","注意"],[3,"どうぶつ","動物"],[3,"はたらく","働く"],[3,"びょういん","病院"],[3,"みらい","未来"],[3,"やくそく","約束"],
+[4,"あいさつ","挨拶"],[4,"いじょう","以上"],[4,"えいきょう","影響"],[4,"かんきょう","環境"],[4,"きょうりょく","協力"],[4,"けいかく","計画"],[4,"けっか","結果"],[4,"さいがい","災害"],[4,"しげん","資源"],[4,"せいかつ","生活"],[4,"せつめい","説明"],[4,"せんそう","戦争"],[4,"そつぎょう","卒業"],[4,"はんだん","判断"],[4,"ひつよう","必要"],[4,"ふくしゅう","復習"],[4,"へんか","変化"],[4,"ぼうさい","防災"],[4,"りゆう","理由"],
+[5,"せきにん","責任"],[5,"ゆにゅう","輸入"],[5,"ゆたか","豊か"],[5,"きずく","築く"],[5,"てきせつ","適切"],[5,"かかく","価格"],[5,"かんしゃ","感謝"],[5,"きょうそう","競争"],[5,"けいざい","経済"],[5,"こうどう","行動"],[5,"さいのう","才能"],[5,"しゅうしょく","就職"],[5,"じょうほう","情報"],[5,"せいさく","政策"],[5,"せいちょう","成長"],[5,"せんたく","選択"],[5,"そんざい","存在"],[5,"はってん","発展"],[5,"ひょうげん","表現"],[5,"ほうほう","方法"],[5,"ぼうえき","貿易"],[5,"むだ","無駄"],[5,"りょういき","領域"],
+[6,"いさん","遺産"],[6,"いっぱん","一般"],[6,"えんそう","演奏"],[6,"かいけつ","解決"],[6,"かんそう","感想"],[6,"きそく","規則"],[6,"きょういく","教育"],[6,"けんり","権利"],[6,"こうせい","構成"],[6,"こくさい","国際"],[6,"さいばん","裁判"],[6,"しせい","姿勢"],[6,"しゅうかく","収穫"],[6,"じゅうよう","重要"],[6,"せいじ","政治"],[6,"せきにん","責任"],[6,"そしき","組織"],[6,"たいしょう","対象"],[6,"ちしき","知識"],[6,"てきとう","適当"],[6,"とうけい","統計"],[6,"はんだん","判断"],[6,"ほうりつ","法律"],[6,"むかんけい","無関係"]
+];
+let grade=0, pool=[], current=0, used=[];
+const setup=document.getElementById('setup'), practice=document.getElementById('practice');
+const promptEl=document.getElementById('prompt'), countEl=document.getElementById('count');
+const answerEl=document.getElementById('answer'), answerKanji=document.getElementById('answerKanji');
+const canvas=document.getElementById('pad'), ctx=canvas.getContext('2d');
+let drawing=false,last=null;
+function resizeCanvas(){const r=canvas.getBoundingClientRect(),d=Math.max(1,devicePixelRatio||1);const old=document.createElement('canvas');old.width=canvas.width;old.height=canvas.height;if(old.width&&old.height)old.getContext('2d').drawImage(canvas,0,0);canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);ctx.setTransform(d,0,0,d,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#252525';ctx.lineWidth=4;if(old.width&&old.height)ctx.drawImage(old,0,0,old.width,old.height,0,0,r.width,r.height)}
+function clearCanvas(){const r=canvas.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height)}
+function drawQuestion(){const q=pool[current];promptEl.textContent=q[1];countEl.textContent=`小学${grade}年生まで・${current+1}/${pool.length}`;answerEl.style.display='none';answerKanji.textContent='';clearCanvas()}
+function chooseGrade(g){grade=g;pool=WORDS.filter(w=>w[0]<=g);used=[];for(let i=pool.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}current=0;setup.style.display='none';practice.style.display='block';requestAnimationFrame(()=>{resizeCanvas();drawQuestion()})}
+document.querySelectorAll('[data-grade]').forEach(b=>b.addEventListener('click',()=>chooseGrade(Number(b.dataset.grade))));
+function pos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);drawing=true;last=pos(e)});
+canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p});
+function stop(){drawing=false;last=null}canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);canvas.addEventListener('lostpointercapture',stop);
+document.getElementById('clear').onclick=clearCanvas;
+document.getElementById('show').onclick=()=>{answerKanji.textContent=pool[current][2];answerEl.style.display='block'};
+document.getElementById('next').onclick=()=>{current=(current+1)%pool.length;drawQuestion()};
+document.getElementById('changeGrade').onclick=()=>{practice.style.display='none';setup.style.display='block';countEl.textContent='';clearCanvas()};
+window.addEventListener('resize',()=>{if(practice.style.display==='block')resizeCanvas()});
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js');
+</script>
+</body></html>
