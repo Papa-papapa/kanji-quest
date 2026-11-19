@@ -14,7 +14,7 @@ header{display:flex;justify-content:space-between;align-items:center;margin:4px 
 h1{font-size:clamp(24px,5vw,34px);margin:0}
 .panel{background:white;border:1px solid #eee1c9;border-radius:20px;padding:clamp(16px,4vw,26px);box-shadow:0 5px 18px #6b4b1710}
 .label{font-size:14px;color:#88765e;margin-bottom:8px}
-.prompt{font-size:clamp(27px,7vw,42px);font-weight:700;letter-spacing:.08em;min-height:1.5em}
+.prompt{font-size:clamp(23px,5.8vw,36px);font-weight:700;letter-spacing:.04em;line-height:1.65;min-height:2.8em;overflow-wrap:anywhere}
 button{border:0;border-radius:12px;padding:13px 18px;font-size:16px;font-weight:650;cursor:pointer}
 .primary{background:#315e49;color:white;flex:1}.secondary{background:#f1eadc;color:#463b2d}
 .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
@@ -22,7 +22,7 @@ button{border:0;border-radius:12px;padding:13px 18px;font-size:16px;font-weight:
 .grade{background:#f1eadc;color:#463b2d;min-height:68px;font-size:20px}
 .grade small{display:block;font-size:12px;font-weight:400;margin-top:3px}
 .canvas-wrap{margin-top:18px}
-input.answer-input{display:block;width:100%;font-size:clamp(30px,8vw,48px);line-height:1.5;text-align:center;padding:16px;border:2px solid #dfd4c2;border-radius:14px;background:#fff;color:#29251f;outline:none;ime-mode:active}
+input.answer-input{display:block;width:100%;height:210px;font-size:clamp(42px,11vw,64px);line-height:1.5;text-align:center;padding:22px;border:2px solid #dfd4c2;border-radius:14px;background:#fff;color:#29251f;outline:none;ime-mode:active}
 input.answer-input:focus{border-color:#47785d;box-shadow:0 0 0 3px #47785d22}
 .api-status{font-size:13px;color:#817565;min-height:1.4em;margin-top:8px}
 
@@ -52,7 +52,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <section class="panel" id="setup">
   <div class="label">はじめに教えてね</div>
   <div class="prompt">何年生？</div>
-  <p>選んだ学年までに習う漢字1,026字の中から、読みをランダムに出題するよ。</p>
+  <p>文章を読んで、空欄に入る漢字や言葉を書こう。答えは漢字1字でも、熟語などの単語でもOK！</p>
   <div class="grade-grid" id="grades">
     <button class="grade" data-grade="1">小学1年生<small>1年生までの80字</small></button>
     <button class="grade" data-grade="2">小学2年生<small>2年生までの240字</small></button>
@@ -61,15 +61,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <button class="grade" data-grade="5">小学5年生<small>5年生までの835字</small></button>
     <button class="grade" data-grade="6">小学6年生<small>6年生までの1,026字</small></button>
   </div>
-  <p class="note">各学年の教育漢字を1字ずつ出題します。10問ごとに採点し、間違えた漢字だけ復習できます。</p>
+  <p class="note">選んだ学年までに習う漢字を使った文章問題を10問出題します。答えは1字または単語です。間違えた問題だけ復習できます。</p>
 </section>
 <section class="panel" id="practice">
-  <div class="label" id="modeLabel">この読みの漢字を書こう</div>
+  <div class="label" id="modeLabel">文章の空欄に入る漢字を書こう</div>
   <div class="prompt" id="prompt"></div>
+  <div class="label" id="wordHint"></div>
   <div class="progress"><div id="progressBar"></div></div>
   <div class="canvas-wrap">
-    <div class="label">答えを1字、Apple Pencilで書いてね</div>
-    <input class="answer-input" id="writtenAnswer" type="text" lang="ja" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ここに漢字を書く" maxlength="4">
+    <div class="label">空欄に入る漢字・単語を書いてね</div>
+    <input class="answer-input" id="writtenAnswer" type="text" lang="ja" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ここに答えを書く" maxlength="12">
     <div class="api-status" id="inputHint">iPadでは入力欄にApple Pencilで書くと、手書き文字がテキストに変換されます。</div>
   </div>
   <div class="actions">
@@ -83,7 +84,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div class="actions"><button class="primary" id="nextQuestion">次の問題へ</button></div>
   </div>
   <div class="actions"><button class="secondary" id="changeGrade">学年を選びなおす</button></div>
-  <p class="note">※iPadOSの日本語手書き入力を使って文字に変換し、入力された漢字と正解を自動照合します。筆跡や書き順そのものの採点ではありません。</p>
+  <p class="note">※iPadOSの日本語手書き入力を使って文字に変換し、入力された答えと正解を照合します。筆跡や書き順そのものの採点ではありません。空白を除いて判定します。</p>
 </section>
 <section class="panel" id="result">
   <div class="page-title" id="resultTitle">テスト結果</div>
@@ -105,6 +106,23 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </section>
 </main>
 <script>
+// 文章の空欄に入れる語彙問題。gradeは答えに使う漢字を学ぶ学年。
+// 答えは漢字1字でも、熟語などの単語でも出題できます。
+const SENTENCE_QUESTIONS = [
+// 1年生
+[1,'あさ、（　　　）を のみます。','水','みず'],[1,'こうえんに 大きな（　　　）が あります。','木','き'],[1,'（　　　）が のぼると あかるく なります。','日','ひ'],[1,'よるに（　　　）が でています。','月','つき'],[1,'そらに 白い（　　　）が うかんでいます。','雲','くも'],[1,'学校へ（　　　）で いきます。','車','くるま'],[1,'（　　　）の はなを つみました。','赤','あか'],[1,'（　　　）い こえで あいさつします。','大','おお'],[1,'山の 上から（　　　）を ながめます。','川','かわ'],[1,'あたらしい（　　　）を つかいます。','本','ほん'],
+// 2年生
+[2,'春に きれいな（　　　）が さきます。','花','はな'],[2,'毎朝、（　　　）を きいて 天気を しらべます。','音','おと'],[2,'（　　　）曜日に 図書館へ 行きます。','月','げつ'],[2,'友だちと 公園で（　　　）びます。','遊','あそ'],[2,'大きな（　　　）に のって 旅行します。','船','ふね'],[2,'（　　　）い 道を ゆっくり 歩きます。','細','ほそ'],[2,'先生の 話を（　　　）きます。','聞','き'],[2,'家の（　　　）で くつを ぬぎます。','前','まえ'],[2,'夕方、（　　　）が 西に しずみます。','日','ひ'],[2,'冬は（　　　）が ふることが あります。','雪','ゆき'],
+// 3年生
+[3,'理科の 時間に（　　　）を かんさつします。','植物','しょくぶつ'],[3,'図書室で 歴史の（　　　）を よみます。','本','ほん'],[3,'遠足の おべんとうを（　　　）意します。','用','よう'],[3,'駅までの 道を 地図で（　　　）べます。','調','しら'],[3,'毎日 少しずつ（　　　）力を つけます。','体','たい'],[3,'夏休みに 海で（　　　）泳を しました。','水','すい'],[3,'町の（　　　）場で はたらく 人に 会いました。','工','こう'],[3,'試合に 勝つために（　　　）習します。','練','れん'],[3,'新しい（　　　）字を ノートに 書きます。','漢','かん'],[3,'太陽の 光で（　　　）物が 育ちます。','植','しょく'],
+// 4年生
+[4,'地図で 日本の（　　　）道を たしかめます。','都','と'],[4,'一年には 四つの（　　　）があります。','季節','きせつ'],[4,'水を きれいにする（　　　）置を 見学しました。','装','そう'],[4,'駅の（　　　）で 待ち合わせます。','改札','かいさつ'],[4,'町の 安全を（　　　）る 仕事があります。','守','まも'],[4,'実験の（　　　）果を ノートに 書きます。','結','けっ'],[4,'暗い 部屋で（　　　）を つけます。','電気','でんき'],[4,'係の 人に（　　　）問します。','質','しつ'],[4,'日本の（　　　）文化を 学びます。','伝統','でんとう'],[4,'毎日の 努力が（　　　）につながります。','成功','せいこう'],
+// 5年生
+[5,'宇宙から 地球の（　　　）景を 見てみたいです。','景','けい'],[5,'ロケットの（　　　）造を 調べます。','構','こう'],[5,'実験の 結果を（　　　）析します。','分','ぶん'],[5,'台風の（　　　）路を 予想します。','進','しん'],[5,'資料を 読んで（　　　）を まとめます。','概要','がいよう'],[5,'植物が 育つ（　　　）を ととのえます。','環境','かんきょう'],[5,'新しい 技術を（　　　）発します。','開','かい'],[5,'安全のために（　　　）を さけます。','危険','きけん'],[5,'地球の（　　　）を 大切にします。','資源','しげん'],[5,'観察したことを 正確に（　　　）録します。','記','き'],
+// 6年生
+[6,'宇宙飛行士が 国際宇宙（　　　）に 滞在します。','船','せん'],[6,'地震に そなえて（　　　）経路を 確認します。','避難','ひなん'],[6,'研究の（　　　）果を 発表します。','成','せい'],[6,'自然の（　　　）を 守る 活動をします。','環境','かんきょう'],[6,'資料の 内容を（　　　）証します。','検','けん'],[6,'意見の ちがいを 話し合って（　　　）します。','解決','かいけつ'],[6,'新しい 発見を 世界に（　　　）します。','発信','はっしん'],[6,'計画を 立てて 効率よく（　　　）します。','実行','じっこう'],[6,'社会の 変化に（　　　）します。','対応','たいおう'],[6,'自分の 考えを 文章で（　　　）します。','表現','ひょうげん']
+].map(([grade,sentence,answer,reading])=>({grade,sentence,answer,reading}));
+
 // 令和2年度実施の学年別漢字配当表に基づく無料の漢字データAPIを利用します。
 // 取得した公開漢字データは端末内(localStorage)に保存し、次回以降の通信を減らします。
 const API='https://api.shirugear.com/kanji/v1/grade/';
@@ -139,32 +157,32 @@ async function loadBank(g){
   return clean;
 }
 async function chooseGrade(g){
-  grade=g;const status=document.getElementById('count');status.textContent='漢字データを読み込み中…';
+  grade=g;const status=document.getElementById('count');status.textContent='問題を準備中…';
   document.querySelectorAll('[data-grade]').forEach(b=>b.disabled=true);
   try{
-    const groups=await Promise.all(Array.from({length:g},(_,i)=>loadBank(i+1)));
-    bank=groups.flat();startTest();
-  }catch(err){
-    status.textContent='';alert('漢字データを読み込めませんでした。インターネット接続を確認して、もう一度お試しください。\n'+err.message);
-  }finally{document.querySelectorAll('[data-grade]').forEach(b=>b.disabled=false);}
+    bank=SENTENCE_QUESTIONS.filter(q=>q.grade<=g);
+    if(bank.length<10)throw new Error('問題データが不足しています。');
+    startTest();
+  }catch(err){status.textContent='';alert(err.message);}
+  finally{document.querySelectorAll('[data-grade]').forEach(b=>b.disabled=false);}
 }
-function startTest(){quiz=shuffle(bank).slice(0,10);wrong=[];answers=[];current=0;mode='test';showPage(practice);document.getElementById('modeLabel').textContent='この読みの漢字を書こう';drawQuestion();}
-function startReview(){if(!wrong.length)return;reviewQueue=shuffle(wrong);current=0;answers=[];mode='review';showPage(practice);document.getElementById('modeLabel').textContent='まちがえた漢字をもう一度';drawQuestion();}
-function drawQuestion(){const list=mode==='test'?quiz:reviewQueue,q=list[current];promptEl.textContent=q.reading;countEl.textContent=`小学${grade}年生まで・${mode==='test'?'テスト':'復習'} ${current+1}/${list.length}`;progressBar.style.width=`${current/list.length*100}%`;written.value='';written.disabled=false;feedback.style.display='none';document.getElementById('check').disabled=false;setTimeout(()=>written.focus({preventScroll:true}),120);}
-function judge(){if(feedback.style.display==='block')return;const q=(mode==='test'?quiz:reviewQueue)[current];const entered=normalize(written.value);if(!entered){alert('漢字を1字入力してね。Apple Pencilで入力欄に書くこともできるよ。');written.focus();return;}
- const correct=entered===q.kanji;
+function startTest(){quiz=shuffle(bank).slice(0,10);wrong=[];answers=[];current=0;mode='test';showPage(practice);document.getElementById('modeLabel').textContent='文章の空欄に入る漢字を書こう';drawQuestion();}
+function startReview(){if(!wrong.length)return;reviewQueue=shuffle(wrong);current=0;answers=[];mode='review';showPage(practice);document.getElementById('modeLabel').textContent='まちがえた文章問題にもう一度チャレンジ';drawQuestion();}
+function drawQuestion(){const list=mode==='test'?quiz:reviewQueue,q=list[current];promptEl.textContent=q.sentence;document.getElementById('wordHint').textContent='ヒント：'+q.reading;countEl.textContent=`小学${grade}年生まで・${mode==='test'?'テスト':'復習'} ${current+1}/${list.length}`;progressBar.style.width=`${current/list.length*100}%`;written.value='';written.disabled=false;feedback.style.display='none';document.getElementById('check').disabled=false;setTimeout(()=>written.focus({preventScroll:true}),120);}
+function judge(){if(feedback.style.display==='block')return;const q=(mode==='test'?quiz:reviewQueue)[current];const entered=normalize(written.value);if(!entered){alert('空欄に入る漢字や単語を書いてね。Apple Pencilでも入力できるよ。');written.focus();return;}
+ const correct=entered===normalize(q.answer);
  answers.push({q,correct,entered});if(!correct&&mode==='test')wrong.push(q);
- document.getElementById('judgeLabel').textContent=correct?'正解！':'おしい！';answerKanji.textContent=q.kanji;
- document.getElementById('selfCheckText').textContent=correct?'正しい漢字が入力できたね！':`入力された字：「${written.value}」／正しい漢字：「${q.kanji}」`;
+ document.getElementById('judgeLabel').textContent=correct?'正解！':'おしい！';answerKanji.textContent=q.answer;
+ document.getElementById('selfCheckText').textContent=correct?'正しい漢字が入力できたね！':`入力された答え：「${written.value}」／正しい答え：「${q.answer}」`;
  feedback.style.display='block';written.disabled=true;document.getElementById('check').disabled=true;
 }
 function advance(){current++;const list=mode==='test'?quiz:reviewQueue;if(current>=list.length){if(mode==='test')showResults();else showReviewResults();}else drawQuestion();}
 function showResults(){showPage(result);const correct=answers.filter(a=>a.correct).length;document.getElementById('resultTitle').textContent='10問テスト 結果';document.getElementById('resultGrade').textContent=`小学${grade}年生までの教育漢字`;
 document.getElementById('score').textContent=`${correct} / 10 問正解`;document.getElementById('resultMessage').textContent=correct===10?'全問正解！すばらしい！':`${10-correct}問まちがえたよ。復習してみよう！`;
-document.getElementById('resultList').innerHTML=answers.map((a,i)=>`<div class="result-item"><span>${i+1}. ${a.q.reading} → <strong>${a.q.kanji}</strong></span><strong class="${a.correct?'':'wrong'}">${a.correct?'正解':'まちがい'}</strong></div>`).join('');
+document.getElementById('resultList').innerHTML=answers.map((a,i)=>`<div class="result-item"><span>${i+1}. ${a.q.sentence} → <strong>${a.q.answer}</strong></span><strong class="${a.correct?'':'wrong'}">${a.correct?'正解':'まちがい'}</strong></div>`).join('');
 document.getElementById('reviewWrong').disabled=wrong.length===0;document.getElementById('reviewWrong').textContent=wrong.length?`まちがえた${wrong.length}問を復習する`:'まちがいはありません';}
 function showReviewResults(){showPage(reviewPage);const correct=answers.filter(a=>a.correct).length;document.getElementById('reviewIntro').textContent=`復習${answers.length}問中 ${correct}問正解！${answers.length-correct?`${answers.length-correct}問はまだまちがいです。`:'復習完了！よくがんばったね。'}`;
-document.getElementById('reviewResultList').innerHTML=answers.map(a=>`<div class="result-item"><span>${a.q.reading} → <strong>${a.q.kanji}</strong></span><strong class="${a.correct?'':'wrong'}">${a.correct?'正解':'まちがい'}</strong></div>`).join('');wrong=answers.filter(a=>!a.correct).map(a=>a.q);
+document.getElementById('reviewResultList').innerHTML=answers.map(a=>`<div class="result-item"><span>${a.q.sentence} → <strong>${a.q.answer}</strong></span><strong class="${a.correct?'':'wrong'}">${a.correct?'正解':'まちがい'}</strong></div>`).join('');wrong=answers.filter(a=>!a.correct).map(a=>a.q);
 const old=document.getElementById('reviewAgain');if(old)old.remove();if(wrong.length){const b=document.createElement('button');b.id='reviewAgain';b.className='primary';b.textContent='残ったまちがいをもう一度';b.onclick=startReview;document.getElementById('reviewIntro').after(b);}}
 function goHome(){countEl.textContent='';showPage(setup);}
 document.querySelectorAll('[data-grade]').forEach(b=>b.addEventListener('click',()=>chooseGrade(Number(b.dataset.grade))));
